@@ -1,49 +1,42 @@
-# zj-quit 
+# zj-confirm
 
-A [zellij](https://zellij.dev/) plugin that prompts for confirmation before killing the current session.
+A [zellij](https://zellij.dev/) plugin that shows a confirmation dialog before closing Session, Pane, or Tab.
 
-![image](https://github.com/cristiand391/zj-quit/assets/6853656/0b2537c4-6872-402b-aa5d-f0713c46c32b)
+## Features
 
-This has been requested multiple times by users:
-* https://github.com/zellij-org/zellij/issues/467
-* https://github.com/zellij-org/zellij/issues/1229
-* https://github.com/zellij-org/zellij/issues/3147
+- [S] Session - Close entire Zellij session
+- [P] Pane - Close current pane
+- [T] Tab - Close current tab
+- [F] Force - Force close current pane
 
-so I decided go the *zellij way* ™️ and made a plugin for this :)
+## Installation
 
-## Usage
-
-Download the last release available at https://github.com/cristiand391/zj-quit/releases/ and set up an alias for it:
-```kdl
-plugins {
-  zj-quit location="file:/path/to/zj-quit.wasm"
-}
+1. Build the plugin:
+```bash
+cargo build --release --target wasm32-wasip1
 ```
 
-https://zellij.dev/documentation/plugin-aliases
+2. Copy the WASM file to your desired location
 
-You can also configure the keybindings within the plugin:
+3. Add to your `~/.config/zellij/config.kdl`:
 
 ```kdl
 plugins {
-  zj-quit location="file:/path/to/zj-quit.wasm" {
-    confirm_key "q"
-    cancel_key "Esc"
+  zj-confirm location="file:/path/to/zj-confirm.wasm"
+}
+
+keybinds {
+  shared {
+    alt-q "TogglePlugin" "zj-confirm"
   }
 }
 ```
 
-Keys are referenced from: [zellij doc](https://docs.rs/zellij-tile/latest/zellij_tile/prelude/enum.Key.html)
+## Usage
 
-Then set a keybind to launch it in a floating window:
-
-```kdl
-keybinds clear-defaults=true {
-  shared_except "locked" {
-    bind "Ctrl q" {
-      LaunchOrFocusPlugin "zj-quit" {
-        floating true
-      }
-    }
-}
-```
+Press `alt-q` to open the confirmation menu, then:
+- Press `S` to close session
+- Press `P` to close pane
+- Press `T` to close tab
+- Press `F` to force close pane
+- Press `E` or `Esc` to cancel
