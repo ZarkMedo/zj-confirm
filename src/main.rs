@@ -12,7 +12,6 @@ enum ConfirmState {
 
 struct State {
     current_state: ConfirmState,
-    confirm_key: KeyWithModifier,
     cancel_key: KeyWithModifier,
 }
 
@@ -20,7 +19,6 @@ impl Default for State {
     fn default() -> Self {
         Self {
             current_state: ConfirmState::Menu,
-            confirm_key: KeyWithModifier::new(BareKey::Enter),
             cancel_key: KeyWithModifier::new(BareKey::Esc),
         }
     }
