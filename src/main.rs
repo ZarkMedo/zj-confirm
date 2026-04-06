@@ -1,16 +1,22 @@
 use zellij_tile::prelude::*;
-
 use std::collections::BTreeMap;
 
+#[derive(Clone, Copy, PartialEq)]
+enum ConfirmState {
+    Menu,
+    ConfirmSession,
+    ConfirmTab,
+}
+
 struct State {
-    confirm_key: KeyWithModifier,
+    current_state: ConfirmState,
     cancel_key: KeyWithModifier,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            confirm_key: KeyWithModifier::new(BareKey::Enter),
+            current_state: ConfirmState::Menu,
             cancel_key: KeyWithModifier::new(BareKey::Esc),
         }
     }
@@ -19,67 +25,130 @@ impl Default for State {
 register_plugin!(State);
 
 impl ZellijPlugin for State {
-    fn load(&mut self, configuration: BTreeMap<String, String>) {
+    fn load(&mut self, _configuration: BTreeMap<String, String>) {
         request_permission(&[PermissionType::ChangeApplicationState]);
         subscribe(&[EventType::Key]);
-
-        if let Some(confirm_key) = configuration.get("confirm_key") {
-            self.confirm_key = confirm_key.parse().unwrap_or(self.confirm_key.clone());
-        }
-        if let Some(abort_key) = configuration.get("cancel_key") {
-            self.cancel_key = abort_key.parse().unwrap_or(self.cancel_key.clone());
-        }
     }
 
     fn update(&mut self, event: Event) -> bool {
         match event {
             Event::Key(key) => {
-                if self.confirm_key == key {
-                    quit_zellij()
-                } else if self.cancel_key == key {
-                    hide_self();
+                subscribe(&[EventType::Key]);
+
+                if self.current_state == ConfirmState::Menu {
+                    match key {
+                        KeyWithModifier { bare_key: BareKey::Char('s'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('S'), .. } => {
+                            self.current_state = ConfirmState::ConfirmSession;
+                            return true;
+                        }
+                        KeyWithModifier { bare_key: BareKey::Char('t'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('T'), .. } => {
+                            self.current_state = ConfirmState::ConfirmTab;
+                            return true;
+                        }
+                        KeyWithModifier { bare_key: BareKey::Char('e'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('E'), .. } => {
+                            hide_self();
+                            return true;
+                        }
+                        _ if self.cancel_key == key => {
+                            hide_self();
+                            return true;
+                        }
+                        _ => {}
+                    }
+                } else {
+                    match key {
+                        KeyWithModifier { bare_key: BareKey::Char('y'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('Y'), .. } => {
+                            self.execute_action();
+                            hide_self();
+                            return true;
+                        }
+                        _ if self.cancel_key == key => {
+                            self.current_state = ConfirmState::Menu;
+                            return true;
+                        }
+                        KeyWithModifier { bare_key: BareKey::Char('n'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('N'), .. } => {
+                            self.current_state = ConfirmState::Menu;
+                            return true;
+                        }
+                        KeyWithModifier { bare_key: BareKey::Char('e'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('E'), .. } => {
+                            hide_self();
+                            return true;
+                        }
+                        _ => {}
+                    }
                 }
             }
-            _ => (),
-        };
+            _ => {}
+        }
         false
     }
 
     fn render(&mut self, rows: usize, cols: usize) {
-        let confirmation_text = "Are you sure you want to kill the current session?".to_string();
-        let confirmation_y_location = (rows / 2) - 2;
-        let confirmation_x_location = cols.saturating_sub(confirmation_text.chars().count()) / 2;
+        match self.current_state {
+            ConfirmState::Menu => self.render_menu(rows, cols),
+            ConfirmState::ConfirmSession | ConfirmState::ConfirmTab => {
+                self.render_confirm(rows, cols)
+            }
+        }
+    }
+}
+
+impl State {
+    fn render_menu(&self, rows: usize, cols: usize) {
+        let items = vec![
+            "[S/s] Session - Close entire session",
+            "[T/t] Tab    - Close current tab",
+            "[E/e] Escape - Cancel/Hide",
+        ];
+
+        let start_y = (rows / 2) - (items.len() / 2);
+
+        for (i, item) in items.iter().enumerate() {
+            let y = start_y + i;
+            let x = cols.saturating_sub(item.chars().count()) / 2;
+            print_text_with_coordinates(
+                Text::new(item.to_string()),
+                x,
+                y,
+                None,
+                None,
+            );
+        }
+    }
+
+    fn render_confirm(&self, rows: usize, cols: usize) {
+        let msg = match self.current_state {
+            ConfirmState::ConfirmSession => "Close Session?",
+            ConfirmState::ConfirmTab => "Close Tab?",
+            _ => return,
+        };
+
+        let confirm_text = format!("{} [Y/y] Yes  [N/n] No  [E/e] Escape", msg);
+        let y = rows / 2;
+        let x = cols.saturating_sub(confirm_text.chars().count()) / 2;
 
         print_text_with_coordinates(
-            Text::new(confirmation_text),
-            confirmation_x_location,
-            confirmation_y_location,
+            Text::new(confirm_text),
+            x,
+            y,
             None,
             None,
         );
+    }
 
-        let help_text = format!(
-            "Help: <{}> - Confirm, <{}> - Cancel",
-            self.confirm_key,
-            self.cancel_key,
-        );
-        let help_text_y_location = rows - 1;
-        let help_text_x_location = cols.saturating_sub(help_text.chars().count()) / 2;
-
-        let confirm_key_length = self.confirm_key.to_string().chars().count();
-        let abort_key_length = self.cancel_key.to_string().chars().count();
-
-        print_text_with_coordinates(
-            Text::new(help_text)
-                .color_range(3, 6..8 + confirm_key_length)
-                .color_range(
-                    3,
-                    20 + confirm_key_length..22 + confirm_key_length + abort_key_length,
-                ),
-            help_text_x_location,
-            help_text_y_location,
-            None,
-            None,
-        );
+    fn execute_action(&self) {
+        match self.current_state {
+            ConfirmState::ConfirmSession => quit_zellij(),
+            ConfirmState::ConfirmTab => {
+                close_focused_tab();
+            }
+            _ => {}
+        }
     }
 }

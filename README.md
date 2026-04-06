@@ -1,49 +1,60 @@
-# zj-quit 
+# zj-confirm
 
-A [zellij](https://zellij.dev/) plugin that prompts for confirmation before killing the current session.
+A [zellij](https://zellij.dev/) plugin that shows a confirmation dialog before closing Session or Tab.
 
-![image](https://github.com/cristiand391/zj-quit/assets/6853656/0b2537c4-6872-402b-aa5d-f0713c46c32b)
+## Features
 
-This has been requested multiple times by users:
-* https://github.com/zellij-org/zellij/issues/467
-* https://github.com/zellij-org/zellij/issues/1229
-* https://github.com/zellij-org/zellij/issues/3147
+- [S/s] Session - Close entire Zellij session
+- [T/t] Tab - Close current tab
+- [E/e] Escape - Cancel
 
-so I decided go the *zellij way* ™️ and made a plugin for this :)
+## Why only Session and Tab?
 
-## Usage
+### Pane close is not implemented
 
-Download the last release available at https://github.com/cristiand391/zj-quit/releases/ and set up an alias for it:
-```kdl
-plugins {
-  zj-quit location="file:/path/to/zj-quit.wasm"
-}
+Zellij's plugin API (`zellij-tile`) does not provide a reliable way to close a specific pane by ID. The `close_focus()` function only closes the focused pane, which can lead to unexpected behavior when the plugin loses keyboard focus.
+
+### Pane误操作成本偏低
+
+Pane 的误操作成本相对较低：
+- Pane 关闭后可以轻松重新创建 (`Ctrl+p n`)
+- 可以通过 `Ctrl+p p` 快速切换回上一个 pane
+-Pane 内容通常可以在其他地方恢复
+
+相比之下，Session 和 Tab 的关闭会导致更严重的后果：
+- Session 关闭会丢失所有 pane 和 tab
+- Tab 关闭会丢失该 tab 内的所有 pane
+
+因此，**Pane 关闭不需要确认**，而 Session 和 Tab 需要。
+
+## Installation
+
+1. Build the plugin:
+```bash
+cargo build --release --target wasm32-wasip1
 ```
 
-https://zellij.dev/documentation/plugin-aliases
+2. Copy the WASM file to your desired location
 
-You can also configure the keybindings within the plugin:
+3. Add to your `~/.config/zellij/config.kdl`:
 
 ```kdl
 plugins {
-  zj-quit location="file:/path/to/zj-quit.wasm" {
-    confirm_key "q"
-    cancel_key "Esc"
+  zj-confirm location="file:/path/to/zj-confirm.wasm"
+}
+
+keybinds {
+  shared {
+    alt-q "LaunchOrFocusPlugin" "zj-confirm" {
+      floating true
+    }
   }
 }
 ```
 
-Keys are referenced from: [zellij doc](https://docs.rs/zellij-tile/latest/zellij_tile/prelude/enum.Key.html)
+## Usage
 
-Then set a keybind to launch it in a floating window:
-
-```kdl
-keybinds clear-defaults=true {
-  shared_except "locked" {
-    bind "Ctrl q" {
-      LaunchOrFocusPlugin "zj-quit" {
-        floating true
-      }
-    }
-}
-```
+Press `alt-q` to open the confirmation menu, then:
+- Press `S` or `s` to close session
+- Press `T` or `t` to close tab
+- Press `E`, `e` or `Esc` to cancel

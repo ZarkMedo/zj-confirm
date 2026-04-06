@@ -1,7 +1,7 @@
 [package]
-name = "zj-quit"
-version = "0.3.0"
-authors = ["Cristian Dominguez"]
+name = "zj-confirm"
+version = "0.0.1"
+authors = ["zarkmedo"]
 edition = "2018"
 
 [dependencies]
