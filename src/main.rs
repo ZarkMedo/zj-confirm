@@ -135,13 +135,13 @@ impl State {
         match self.current_state {
             ConfirmState::ConfirmSession => quit_zellij(),
             ConfirmState::ConfirmPane => {
-                // TODO: 实现 pane 关闭 - 使用 ClosePaneWithId
+                close_focus();
             }
             ConfirmState::ConfirmTab => {
-                // TODO: 实现 tab 关闭 - 使用 CloseTabWithIndex
+                close_focused_tab();
             }
             ConfirmState::ConfirmForcePane => {
-                // TODO: 实现强制关闭 pane - 使用 KillPane
+                close_focus();
             }
             _ => {}
         }
