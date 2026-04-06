@@ -5,9 +5,7 @@ use std::collections::BTreeMap;
 enum ConfirmState {
     Menu,
     ConfirmSession,
-    ConfirmPane,
     ConfirmTab,
-    ConfirmForcePane,
 }
 
 struct State {
@@ -35,34 +33,52 @@ impl ZellijPlugin for State {
     fn update(&mut self, event: Event) -> bool {
         match event {
             Event::Key(key) => {
+                subscribe(&[EventType::Key]);
+
                 if self.current_state == ConfirmState::Menu {
                     match key {
-                        KeyWithModifier { bare_key: BareKey::Char('s'), key_modifiers } if key_modifiers.is_empty() => {
+                        KeyWithModifier { bare_key: BareKey::Char('s'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('S'), .. } => {
                             self.current_state = ConfirmState::ConfirmSession;
+                            return true;
                         }
-                        KeyWithModifier { bare_key: BareKey::Char('p'), key_modifiers } if key_modifiers.is_empty() => {
-                            self.current_state = ConfirmState::ConfirmPane;
-                        }
-                        KeyWithModifier { bare_key: BareKey::Char('t'), key_modifiers } if key_modifiers.is_empty() => {
+                        KeyWithModifier { bare_key: BareKey::Char('t'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('T'), .. } => {
                             self.current_state = ConfirmState::ConfirmTab;
+                            return true;
                         }
-                        KeyWithModifier { bare_key: BareKey::Char('f'), key_modifiers } if key_modifiers.is_empty() => {
-                            self.current_state = ConfirmState::ConfirmForcePane;
+                        KeyWithModifier { bare_key: BareKey::Char('e'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('E'), .. } => {
+                            hide_self();
+                            return true;
                         }
-                        _ if self.cancel_key == key => hide_self(),
+                        _ if self.cancel_key == key => {
+                            hide_self();
+                            return true;
+                        }
                         _ => {}
                     }
                 } else {
                     match key {
-                        KeyWithModifier { bare_key: BareKey::Char('y'), key_modifiers } if key_modifiers.is_empty() => {
+                        KeyWithModifier { bare_key: BareKey::Char('y'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('Y'), .. } => {
                             self.execute_action();
                             hide_self();
+                            return true;
                         }
-                        _ if self.cancel_key == key || key == KeyWithModifier::new(BareKey::Char('n')) => {
+                        _ if self.cancel_key == key => {
                             self.current_state = ConfirmState::Menu;
+                            return true;
                         }
-                        _ if key == KeyWithModifier::new(BareKey::Char('e')) => {
+                        KeyWithModifier { bare_key: BareKey::Char('n'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('N'), .. } => {
+                            self.current_state = ConfirmState::Menu;
+                            return true;
+                        }
+                        KeyWithModifier { bare_key: BareKey::Char('e'), .. }
+                        | KeyWithModifier { bare_key: BareKey::Char('E'), .. } => {
                             hide_self();
+                            return true;
                         }
                         _ => {}
                     }
@@ -76,10 +92,9 @@ impl ZellijPlugin for State {
     fn render(&mut self, rows: usize, cols: usize) {
         match self.current_state {
             ConfirmState::Menu => self.render_menu(rows, cols),
-            ConfirmState::ConfirmSession
-            | ConfirmState::ConfirmPane
-            | ConfirmState::ConfirmTab
-            | ConfirmState::ConfirmForcePane => self.render_confirm(rows, cols),
+            ConfirmState::ConfirmSession | ConfirmState::ConfirmTab => {
+                self.render_confirm(rows, cols)
+            }
         }
     }
 }
@@ -87,11 +102,9 @@ impl ZellijPlugin for State {
 impl State {
     fn render_menu(&self, rows: usize, cols: usize) {
         let items = vec![
-            "[S] Session   - Close entire session",
-            "[P] Pane     - Close current pane",
-            "[T] Tab      - Close current tab",
-            "[F] Force    - Force close current pane",
-            "[E] Escape   - Cancel/Hide",
+            "[S/s] Session - Close entire session",
+            "[T/t] Tab    - Close current tab",
+            "[E/e] Escape - Cancel/Hide",
         ];
 
         let start_y = (rows / 2) - (items.len() / 2);
@@ -112,13 +125,11 @@ impl State {
     fn render_confirm(&self, rows: usize, cols: usize) {
         let msg = match self.current_state {
             ConfirmState::ConfirmSession => "Close Session?",
-            ConfirmState::ConfirmPane => "Close Pane?",
             ConfirmState::ConfirmTab => "Close Tab?",
-            ConfirmState::ConfirmForcePane => "Force Close Pane?",
             _ => return,
         };
 
-        let confirm_text = format!("{} [Y] Yes  [N] No  [E] Escape", msg);
+        let confirm_text = format!("{} [Y/y] Yes  [N/n] No  [E/e] Escape", msg);
         let y = rows / 2;
         let x = cols.saturating_sub(confirm_text.chars().count()) / 2;
 
@@ -134,14 +145,8 @@ impl State {
     fn execute_action(&self) {
         match self.current_state {
             ConfirmState::ConfirmSession => quit_zellij(),
-            ConfirmState::ConfirmPane => {
-                close_focus();
-            }
             ConfirmState::ConfirmTab => {
                 close_focused_tab();
-            }
-            ConfirmState::ConfirmForcePane => {
-                close_focus();
             }
             _ => {}
         }
