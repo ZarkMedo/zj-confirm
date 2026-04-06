@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 enum ConfirmState {
     Menu,
     ConfirmSession,
-    ConfirmPane,
     ConfirmTab,
 }
 
@@ -41,11 +40,6 @@ impl ZellijPlugin for State {
                         KeyWithModifier { bare_key: BareKey::Char('s'), .. }
                         | KeyWithModifier { bare_key: BareKey::Char('S'), .. } => {
                             self.current_state = ConfirmState::ConfirmSession;
-                            return true;
-                        }
-                        KeyWithModifier { bare_key: BareKey::Char('p'), .. }
-                        | KeyWithModifier { bare_key: BareKey::Char('P'), .. } => {
-                            self.current_state = ConfirmState::ConfirmPane;
                             return true;
                         }
                         KeyWithModifier { bare_key: BareKey::Char('t'), .. }
@@ -98,9 +92,9 @@ impl ZellijPlugin for State {
     fn render(&mut self, rows: usize, cols: usize) {
         match self.current_state {
             ConfirmState::Menu => self.render_menu(rows, cols),
-            ConfirmState::ConfirmSession
-            | ConfirmState::ConfirmPane
-            | ConfirmState::ConfirmTab => self.render_confirm(rows, cols),
+            ConfirmState::ConfirmSession | ConfirmState::ConfirmTab => {
+                self.render_confirm(rows, cols)
+            }
         }
     }
 }
@@ -109,7 +103,6 @@ impl State {
     fn render_menu(&self, rows: usize, cols: usize) {
         let items = vec![
             "[S/s] Session - Close entire session",
-            "[P/p] Pane   - Close current pane",
             "[T/t] Tab    - Close current tab",
             "[E/e] Escape - Cancel/Hide",
         ];
@@ -132,7 +125,6 @@ impl State {
     fn render_confirm(&self, rows: usize, cols: usize) {
         let msg = match self.current_state {
             ConfirmState::ConfirmSession => "Close Session?",
-            ConfirmState::ConfirmPane => "Close Pane?",
             ConfirmState::ConfirmTab => "Close Tab?",
             _ => return,
         };
@@ -153,9 +145,6 @@ impl State {
     fn execute_action(&self) {
         match self.current_state {
             ConfirmState::ConfirmSession => quit_zellij(),
-            ConfirmState::ConfirmPane => {
-                close_focus();
-            }
             ConfirmState::ConfirmTab => {
                 close_focused_tab();
             }
